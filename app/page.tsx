@@ -1,69 +1,110 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import type { Feedback, Origin, Post, Status } from "@/lib/types";
+import { getNextPost } from "@/lib/posts";
+import { PostCard } from "@/components/PostCard";
+import { ChoiceButtons } from "@/components/ChoiceButtons";
+import { FeedbackBanner } from "@/components/FeedbackBanner";
 
 export default function Home() {
+  const [post, setPost] = useState<Post | null>(null);
+  const [status, setStatus] = useState<Status>("loading");
+  const [selected, setSelected] = useState<Origin | null>(null);
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  async function loadPost() {
+    setSelected(null);
+    setFeedback(null);
+    setStatus("loading");
+    try {
+      const next = await getNextPost();
+      setPost(next);
+      setStatus("answering");
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    async function init() {
+      try {
+        const next = await getNextPost();
+        if (!cancelled) {
+          setPost(next);
+          setStatus("answering");
+        }
+      } catch {
+        if (!cancelled) setStatus("error");
+      }
+    }
+    init();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleSelect(origin: Origin) {
+    if (!post || status !== "answering") return;
+    setSelected(origin);
+    setFeedback(origin === post.origin ? "correct" : "wrong");
+    setStatus("answered");
+  }
+
+  const scene = feedback === "correct" ? "correct" : feedback === "wrong" ? "wrong" : "idle";
+
+  const greenOn = scene === "correct";
+  const redOn = scene === "wrong";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0c0b11] px-6 py-16">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="radial-base absolute inset-0 opacity-[0.2]" />
+        <div
+          className={`radial-correct absolute inset-0 transition-opacity duration-700 ease-out ${greenOn ? "opacity-[0.2]" : "opacity-0"}`}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+        <div
+          className={`radial-wrong absolute inset-0 transition-opacity duration-700 ease-out ${redOn ? "opacity-[0.2]" : "opacity-0"}`}
+        />
+      </div>
+      <div className="relative w-full max-w-xl">
+        {status === "loading" && (
+          <div className="flex justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="flex flex-col items-center gap-4 text-center">
+            <p className="text-white/70">Não foi possível carregar a postagem.</p>
+            <button
+              type="button"
+              onClick={loadPost}
+              className="rounded-xl bg-white/10 px-5 py-3 text-sm font-medium text-white/90 transition-colors hover:bg-white/15"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {post && (status === "answering" || status === "answered") && (
+          <div className="flex flex-col gap-8">
+            <PostCard post={post} />
+            <ChoiceButtons
+              status={status}
+              selected={selected}
+              correct={post.origin}
+              onSelect={handleSelect}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <FeedbackBanner
+              feedback={feedback}
+              correct={post.origin}
+              onContinue={loadPost}
+            />
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
