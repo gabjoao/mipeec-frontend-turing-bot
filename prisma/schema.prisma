@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model postagens {
+  id                   Int                   @id @default(autoincrement())
+  texto                String
+  origem               String
+  engajamento          Int?
+  artificial           Boolean               @default(false)
+  candidata_id         Int?
+  criado_em            DateTime              @default(now())
+  postagens_candidatas postagens_candidatas? @relation(fields: [candidata_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([origem], map: "idx_postagens_origem")
+}
+
+model postagens_candidatas {
+  id                       Int         @id @default(autoincrement())
+  post_id_origem           String
+  plataforma               String
+  texto_bruto              String
+  texto_anonimizado        String
+  curtidas                 Int         @default(0)
+  compartilhamentos        Int         @default(0)
+  respostas                Int         @default(0)
+  seguidores_autor         Int         @default(0)
+  engajamento_bruto        Int         @default(0)
+  engajamento_relativo     Float?
+  flag_sensivel_plataforma Boolean     @default(false)
+  revisado_manualmente     Boolean     @default(false)
+  aprovado                 Boolean?
+  publicado_em             DateTime
+  coletado_em              DateTime    @default(now())
+  atualizado_em            DateTime    @default(now())
+  postagens                postagens[]
+
+  @@unique([plataforma, post_id_origem], map: "sqlite_autoindex_postagens_candidatas_1")
+  @@index([revisado_manualmente, aprovado], map: "idx_candidatas_revisao")
+  @@index([plataforma], map: "idx_candidatas_plataforma")
+  @@index([aprovado, engajamento_relativo(sort: Desc)], map: "idx_candidatas_ranking")
+}
